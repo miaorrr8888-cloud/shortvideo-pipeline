@@ -1,5 +1,7 @@
 # 短视频生产材料流水线
 
+[新手逐步使用指南](USER_GUIDE.md) · [用途与适用人群介绍](INTRODUCTION.md)
+
 `shortvideo-pipeline` · 独立技能仓库 · MIT
 
 适合：需要写口播稿、分镜和字幕的创作者、小商家
