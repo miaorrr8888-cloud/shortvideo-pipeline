@@ -33,7 +33,7 @@ python -m shortvideo_pipeline.cli self-test
 
 ## 当前限制
 
-仍需安装 FFmpeg 和 Pillow；字幕为可切换字幕轨道，不是烧录到画面。尚无自动配音、剪映工程、动态剪辑或平台发布；真实素材和成片仍需人工验收。
+配音依赖 Windows 已安装的声音；Linux/macOS 仍需提供外部录音。受限运行环境可能无法初始化系统声音，不应修改安全策略来绕过。生成声音需要试听；静态图片视频不等于复杂动态剪辑或平台验收。
 
 ## 验证与使用注意
 
@@ -69,3 +69,15 @@ python scripts/render_slideshow.py examples/slides/manifest.json demo.mp4 --subt
 ## 接入依据
 
 [FFmpeg 官方文档](https://ffmpeg.org/ffmpeg.html)。渲染以本地提供的音视频素材为输入，没有下载素材或发布操作。
+
+## 第三轮：本地配音与一键成片
+
+新增 Windows SAPI 中文/英文离线配音，以及文本→配音→图片视频的一键流程；画面时长自动延长以完整容纳语音，失败保留阶段状态。已实际生成中文配音并合成视频。
+
+```sh
+python -m pip install Pillow
+python scripts/synthesize_voice.py examples/narration.txt narration.wav --language zh-CN
+python scripts/make_narrated_video.py examples/slides/manifest.json examples/narration.txt narrated-output
+# FFmpeg 未在 PATH：追加 --ffmpeg /path/to/ffmpeg
+# 接入自己的字幕：追加 --subtitles captions.srt
+```
