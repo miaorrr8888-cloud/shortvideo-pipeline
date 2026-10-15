@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shortvideo-pipeline"
+version = "0.1.0"
+description = "短视频内容批量生成流水线：按 9 步框架产出短视频生产包（口播稿/分镜/字幕/封面/BGM/发布）"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []  # 零第三方依赖，仅标准库
+
+[project.scripts]
+shortvideo-pipeline = "shortvideo_pipeline.cli:main"
+
+[tool.setuptools]
+packages = ["shortvideo_pipeline", "shortvideo_pipeline.llm", "shortvideo_pipeline.steps"]
