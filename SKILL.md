@@ -1,6 +1,6 @@
 ---
 name: shortvideo-pipeline
-description: 生成短视频材料，支持Windows本地自动配音与图片视频渲染；适用于脚本到简单成片，不自动发布。
+description: 把用户图片与介绍文字合成带中文配音的MP4，支持MeloTTS本地声音、环境检查与安装排错；也可生成脚本分镜，不自动发布。
 license: MIT
 ---
 
@@ -29,3 +29,11 @@ mock 结果仅用于结构演示，不能当成真实模型创意。本包提供
 ## 面向使用者的说明
 
 解释用途、适用人群、下载和第一次运行时，读 [USER_GUIDE.md](USER_GUIDE.md)；需要中文对外介绍时参考 [INTRODUCTION.md](INTRODUCTION.md)，不要把介绍稿等同于已发布。
+
+## 新版本地配音与代安装
+
+用户要做“照片+介绍→有配音视频”时，优先读USER_GUIDE.md并走MeloTTS路线，不默认选旧Windows系统声音。安装/失败时读安装与排错.md；用户希望WorkBuddy协助时提供WORKBUDDY.md的任务，不声称已在该客户端跑通。
+
+入口：`python scripts/start_here.py --install --demo`。它在项目.venv安装依赖并下载固定校验值的官方模型，生成不覆盖已有目录的示例。已安装时用.venv里的Python执行`--doctor`检查；READY只表示环境通过。
+
+换成用户素材时使用scripts/make_melo_video.py；保留清单相对路径限制和新输出目录要求。画面时长自动覆盖配音长度；逐句多图需要另做分镜，不把基础轮播当作自动语义配图。完成后返回真实MP4路径、检查音轨与解码，再请用户试听。

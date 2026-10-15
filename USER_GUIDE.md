@@ -1,91 +1,69 @@
-# 文字变配音视频：用户使用指南
+# 照片变配音视频：从下载到打开成片
 
-## 它能帮你做什么
+你给几张商品图和几句介绍，这个工具把介绍读出来，配上图片，做成MP4。新版使用MeloTTS中文模型，不用Windows系统音色。以Windows + Python 3.12为本次验证环境。
 
-把文字生成本地语音，再把图片按时长合成MP4；可接入自己的SRT字幕。也能单独生成脚本、分镜和字幕材料。
+## 不会安装？先用WorkBuddy协助
 
-## 适合谁
+可以先把仓库地址交给WorkBuddy，并粘贴[WORKBUDDY.md](WORKBUDDY.md)里的任务。让它先检查环境、安装到你选定的目录，再用示例生成视频。当前没有完成WorkBuddy客户端导入及执行实测，不把“看见链接”当作安装成功。
 
-需要做简单讲解视频的创作者、小商家、课程作者；先从Windows电脑上的演示开始。
+## 自己装：按这7步做
 
-## 具体解决什么问题
+### 1. 下载整个技能
 
-已有文案和图片，还要分别配音、安排画面时长、合成视频，容易漏步骤或截断语音。
+[点这里下载ZIP](https://github.com/miaorrr8888-cloud/shortvideo-pipeline/archive/refs/heads/main.zip)。也可以打开仓库，点绿色Code，再点Download ZIP。
 
-**不适合这些目标：**复杂动态剪辑、数字人口型、自动发布和保证成片创意质量。macOS/Linux不能使用这条Windows系统配音路线。
+你应该得到 shortvideo-pipeline-main.zip。不要只保存网页或复制SKILL.md。
 
-## 下载与准备
+### 2. 解压，再打开里面的文件夹
 
-- [打开独立仓库](https://github.com/miaorrr8888-cloud/shortvideo-pipeline)
-- [直接下载源码ZIP](https://github.com/miaorrr8888-cloud/shortvideo-pipeline/archive/refs/heads/main.zip)
+右键压缩包 → 全部解压。进入能同时看见 SKILL.md、开始使用.cmd、scripts、examples 的那一层。
+建议放在自己有权限的目录，例如“文档/我的视频工具”。不要放在系统目录。
 
-也可在仓库页面点 Code → Download ZIP。解压后打开包含 SKILL.md、README.md、USER_GUIDE.md 的那层文件夹。不要停在外层目录或只复制一个脚本。
+### 3. 准备Python 3.12
 
-建议使用Windows电脑和Python 3.12；这是本次验证环境。先在该文件夹打开PowerShell，再执行：
+若电脑没有Python 3.12，从[Python官网](https://www.python.org/downloads/windows/)下载3.12系列Windows安装器，选择“仅为当前用户安装”，勾选安装器提供的Add python.exe to PATH。不要卸载其他项目已有的Python。
+
+不确定是否装好，可让WorkBuddy检查，或在终端输入 `py -3.12 --version`，应该看到 Python 3.12.x。没有py时，检查 `python --version`。本自动安装路线只验证了3.12。
+
+### 4. 双击“开始使用.cmd”
+
+它会在项目里创建 .venv，安装必要工具，再从GitHub下载约167MB的中文语音模型；模型解压后会占更多空间。首次需要联网，模型准备好后，配音在本机完成。脚本不需要管理员权限，不会自动发布。
+
+窗口依次显示“创建运行环境”“安装工具”“检查中文语音模型”“生成视频”。下载时间受网速影响；未显示完成前不要关窗口。断网后重新运行会续传模型，失败会留下检查结果。
+
+如果系统提示文件风险或组织限制，先核对来源或交给助手分析，不要强行绕过。
+
+### 5. 找到刚生成的视频
+
+窗口出现“已生成，请打开：……”才代表示例生成成功。打开其给出的 runs/demo-日期-时间/video.mp4。
+同一目录的 narration.wav 是配音。runs/setup-result.json 是检查记录。自己听一遍、看一遍，确认没有念错或放错图。
+
+### 6. 换成自己的图片和文字
+
+先复制 examples/slides 到 examples/my-slides。把自己的图片放进去，编辑里面的 manifest.json：每张图写相对文件名和seconds；图片要在该清单目录内。把介绍另存为 examples/my-narration.txt（UTF-8）。
+
+```json
+{"slides":[{"image":"商品正面.jpg","seconds":2},{"image":"桌面场景.jpg","seconds":2}]}
+```
+
+seconds表示相对展示时长；文案更长时，工具会自动延长总时长，不把声音截断。需要严格一句两图时，先分句并为每句安排两幅画面；基础清单不会自动理解每句话的内容或自动找图。视频V5的72幅画面由本次人工分镜制作。
+
+### 7. 再生成一次
+
+在技能文件夹地址栏输入 powershell 回车，在打开的窗口粘贴：
 
 ```powershell
-python --version
-python -m venv .venv
-.\.venv\Scripts\python.exe --version
+$videoFfmpeg = & .\.venv\Scripts\python.exe -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
+.\.venv\Scripts\python.exe scripts/make_melo_video.py examples/my-slides/manifest.json examples/my-narration.txt runs/my-video-01 --model-dir models/vits-melo-tts-zh_en --ffmpeg $videoFfmpeg
 ```
 
-这里直接使用虚拟环境里的Python，不需要运行激活脚本或修改系统执行策略。安装步骤及其他系统说明见[通用安装说明](https://github.com/miaorrr8888-cloud/agent-skills-worklog/blob/main/INSTALLATION.md)。
+做完打开 runs/my-video-01/video.mp4。重做时改为my-video-02等新目录，不会覆盖原结果。不会改文件或命令，直接让WorkBuddy根据你的图片和介绍代做，并要求读回成片位置。
 
-安装本示例需要的依赖：
+## 发生问题，先看这里
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install Pillow imageio-ffmpeg==0.6.0
-```
+读[安装与排错.md](安装与排错.md)。不要反复重装全部环境。请把报错最后几行与 runs/setup-result.json 交给助手；不要只说“不能用”。
 
-## 第一次使用：先跑自带示例
+## 当前能做什么
 
-用仓库里的两张演示图片和一段中文文本，生成一段带中文配音的简单视频。
-
-```powershell
-$skillFfmpeg = & .\.venv\Scripts\python.exe -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
-.\.venv\Scripts\python.exe scripts/make_narrated_video.py examples/slides/manifest.json examples/narration.txt reader-demo-video --ffmpeg $skillFfmpeg
-```
-
-## 结果怎么看
-
-新建 reader-demo-video 文件夹，其中有 video.mp4、narration.wav、status.json。状态 GENERATED_REVIEW_REQUIRED 表示已生成、仍要试听和看图；不是人工验收通过。
-
-## 换成自己的资料
-
-examples/narration.txt 是配音稿；examples/slides/manifest.json 的 slides 数组填写图片相对路径和 seconds。图片放在清单所在目录内。
-
-先复制 examples/slides 到自己的工作目录，换成自己的图片；另存文案，再把命令中的清单和文案路径换成自己的文件。输出目录必须换一个新名字。
-
-## 不想手动敲命令：给AI助手的任务
-
-以下任务适用于能读取所选目录、执行本地命令的助手。WorkBuddy需要先确认当前版本的权限与技能启用状态；本项目未完成WorkBuddy实际导入验收。
-
-```text
-请先读取我选定文件夹中的 SKILL.md 和 USER_GUIDE.md，只在该项目范围内处理。
-先运行仓库自带示例，把中文文案合成带配音的图片视频。检查Python、Pillow、FFmpeg和本地中文声音，把结果写入新的 reader-demo-video 目录。不要调用云端付费模型、不要发布视频；完成后告诉我视频文件在哪里、还有什么需要试听验收。
-缺少依赖时先说明用途，优先放进本项目虚拟环境；不要读取其他目录中的密码、密钥或浏览器登录数据。
-```
-
-## 常见问题
-
-**找不到FFmpeg**
-
-按下方先取得 imageio-ffmpeg 的可执行文件路径，再通过 --ffmpeg 传入。
-
-**语音不自然或数字读错**
-
-先听 narration.wav；改写文案中的数字、缩写或读音，再用新输出目录重做。
-
-**找不到文件或脚本**
-
-确认终端当前目录就是包含SKILL.md的技能根目录；路径含空格时加双引号。输出目录已存在时换新名字，不覆盖已有结果。
-
-## 当前能力边界
-
-当前以静态图片视频为主。Windows需安装对应语言的本地声音；系统声音不能初始化时先核对运行环境，不修改安全策略强行绕过。字幕轨道不是烧录在画面里的字幕。
-
-## 验证范围
-
-本指南示例已在Windows独立副本中运行复核，见[命令复核结果](https://github.com/miaorrr8888-cloud/agent-skills-worklog/blob/main/USER_GUIDES_VERIFICATION.md)。已有回归测试只覆盖被测试行为，不证明真实业务结果。WorkBuddy实际运行、手机端使用和所有系统版本均不在本次已验证范围内。
-
-许可证和素材来源分别见 [LICENSE](LICENSE)、[PROVENANCE.md](PROVENANCE.md)。
+可以解决：图片和文字分别配音、合成步骤多；配音比画面长造成截断；第一次依赖缺失难定位；换图换稿后重复制作。
+当前主要是图片轮播加解说，不是动态拍摄、数字人口型或自动运营。读音、事实和素材许可需要人检查。WorkBuddy自身可能消耗账户额度；本工具配音不用云端收费接口。
