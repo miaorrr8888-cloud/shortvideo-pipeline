@@ -1,5 +1,7 @@
 # 照片加文字，做成配音小视频
 
+**视频同款晓晓女声：先读[晓晓使用指南](晓晓使用指南.md)，下载解压后双击“开始晓晓配音.cmd”。** 下方MeloTTS是另一种离线配音方案。
+
 [从下载到打开成片：7步教程](USER_GUIDE.md) · [让WorkBuddy帮你安装](WORKBUDDY.md) · [安装与排错](安装与排错.md) · [用途与适用人群介绍](INTRODUCTION.md)
 
 `shortvideo-pipeline` · 独立技能仓库 · MIT

@@ -8,3 +8,5 @@
 [阶段性工作记录](https://github.com/miaorrr8888-cloud/agent-skills-worklog/blob/main/WORK_LOG.md)
 
 新增本地语音：MeloTTS（https://github.com/myshell-ai/MeloTTS，MIT），通过sherpa-onnx（https://github.com/k2-fsa/sherpa-onnx，Apache-2.0）运行官方vits-melo-tts-zh_en模型。第三方权重和运行库不打包进仓库，首次由安装器下载；各自许可保留。
+
+晓晓在线配音通过edge-tts（https://github.com/rany2/edge-tts，LGPL-3.0）及websocket-client运行；调用该项目的请求/解析函数，遵循其许可证及服务自身条款。
