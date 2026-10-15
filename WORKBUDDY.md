@@ -17,3 +17,7 @@ https://github.com/miaorrr8888-cloud/shortvideo-pipeline
 ```
 
 官方依据：[WorkBuddy技能说明](https://www.workbuddy.cn/docs/workbuddy/From-Beginner-to-Expert-Guide/Function-Description/Skills-Market)说明支持导入本地技能包；[官方产品介绍](https://cloud.tencent.com/product/workbuddy)说明支持在授权目录内读写本地文件。仅发送链接不等于已完成安装；本项目尚未完成WorkBuddy端实测。
+
+## 一批商品或反复改稿
+
+使用[批量商品视频.md](批量商品视频.md)里的完整任务，先整理清单、检查逐句图片，再批量生成。不要把旧单条制作入口当成批处理。

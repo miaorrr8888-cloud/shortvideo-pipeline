@@ -1,0 +1,64 @@
+{
+  "jobs": [
+    {
+      "id": "cup-overview",
+      "title": "杯子小介绍",
+      "sentences": [
+        {
+          "text": "这只杯子，杯身是蓝绿色。",
+          "images": [
+            "images/cup-1.png",
+            "images/cup-2.png"
+          ]
+        },
+        {
+          "text": "杯把是橙色，正面有一个白色三角形。",
+          "images": [
+            "images/cup-2.png",
+            "images/cup-1.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cup-table",
+      "title": "杯子桌面展示",
+      "sentences": [
+        {
+          "text": "第二张图，是杯子放在桌上的样子。",
+          "images": [
+            "images/cup-1.png",
+            "images/cup-2.png"
+          ]
+        },
+        {
+          "text": "两张图片，配上你写的介绍，就能做成小视频。",
+          "images": [
+            "images/cup-2.png",
+            "images/cup-1.png"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cup-detail",
+      "title": "杯子细节展示",
+      "sentences": [
+        {
+          "text": "这只杯子，杯身是蓝绿色。",
+          "images": [
+            "images/cup-2.png",
+            "images/cup-1.png"
+          ]
+        },
+        {
+          "text": "想换一句介绍，改完文字再做就可以。",
+          "images": [
+            "images/cup-1.png",
+            "images/cup-2.png"
+          ]
+        }
+      ]
+    }
+  ]
+}
