@@ -8,6 +8,33 @@
 
 适合：需要给商品图配口播视频的小商家、电商运营、内容创作者
 
+## 安装
+
+**方式一：作为 WorkBuddy 技能安装（推荐）**
+
+```sh
+# 把整个目录放进技能目录，重开对话即可被识别
+xcopy /E /I shortvideo-pipeline "%USERPROFILE%\.workbuddy\skills\shortvideo-pipeline"
+```
+
+**方式二：当作普通 Python 包用**
+
+```sh
+python -m pip install -r requirements.txt    # Pillow + imageio-ffmpeg（自带 ffmpeg 二进制）
+python scripts/make_video.py --check         # 先自检，全 PASS 再出片
+```
+
+**环境要求（实测过的组合）**
+
+| 项 | 要求 | 不满足会怎样 |
+|---|---|---|
+| Python | 3.10+（实测 3.13） | 启动即报语法错 |
+| Pillow | >=10 | 合成画面失败 |
+| ffmpeg | imageio-ffmpeg 自带，或系统 PATH | `--check` 报 FFmpeg 不可用 |
+| 中文字体 | Windows 微软雅黑 `msyhbd.ttc` | 标题渲染抛错（其他系统需改字体路径） |
+| 中文语音 | Windows SAPI 中文音色（如 Huihui） | 离线配音不可用，只能走在线 |
+| 在线配音（可选） | `pip install edge-tts websocket-client` | 晓晓音色不可用，需加 `--allow-online-voice` |
+
 ## 快速开始（三条命令）
 
 ```sh
@@ -86,6 +113,20 @@ python scripts/make_video.py --products "D:\素材\全部商品" --out "D:\成�
 6. **离线配音不再依赖 edge-tts**：只在真要走在线时才导入，缺依赖不影响离线出片。
 7. **MeloTTS 报错归因修正**：先校验输入再导入依赖，缺依赖时报「缺依赖」而不是把参数错误误报成别的问题。
 8. **示例瘦身**：示例图 1254px PNG（3.8MB）→ 720px JPEG，安装包能压进 3MB 以内。
+
+## 适用用户
+
+**适合：**
+
+- 抖音 / 视频号 / 小红书上做商品带货，需要按 SKU 批量出竖屏口播视频的人；
+- 手上只有供应商白底图和一段卖点文案，没有剪辑能力、也不想学剪辑的人；
+- 在意文案不外传的人——默认走本机离线配音，文字不出本机。
+
+**不适合：**
+
+- 需要真人出镜、剧情拍摄的账号（本工具只做图片 + 配音 + 烧录字幕的图文视频）；
+- 追求一键成片、不愿核对读音和字幕错字的人——工具明确要求人工复核后才发布；
+- 非 Windows 环境且不愿改字体与语音配置的人（Linux/macOS 未实测）。
 
 ## 当前限制
 
