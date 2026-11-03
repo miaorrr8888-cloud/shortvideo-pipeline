@@ -1,49 +1,73 @@
 ---
 name: shortvideo-pipeline
-description: 把用户图片与介绍文字合成带中文配音的MP4，支持MeloTTS本地声音、环境检查与安装排错；也可生成脚本分镜，不自动发布。
+description: 给商品图片和一段介绍，一条命令做出带中文配音、烧录字幕的竖屏视频；支持批量、缓存复用和局部改稿，配音默认本机离线，联网配音必须先经用户同意。
 license: MIT
+version: "0.2.2"
+display_name: "批量商品配音视频"
+agent_created: true
+
 ---
+# 批量商品配音视频
 
-# 短视频生产材料
+用户要「照片 + 介绍 → 有配音的视频」时，只走这一个入口：
 
-在该包目录运行 `python -m shortvideo_pipeline.cli --help` 查看命令，`python -m shortvideo_pipeline.cli demo` 生成离线 mock 示例，`python -m unittest discover -s tests -v` 运行测试。
+```sh
+python scripts/make_video.py --check
+python scripts/make_video.py --images "<图片文件夹>" --out "<输出目录>"
+python scripts/make_video.py --products "<商品根目录>" --out "<输出目录>"
+```
 
-先明确选题、观众、平台、目标时长与事实素材。single 与 batch 接受简报并产出脚本、分镜、字幕和准备材料。对真实模型的调用需先配置所选 provider；凭据只从本地环境或 .env 读取，禁止提交真实 .env。
+先跑 `--check`，把 PASS/FAIL 如实转述给用户，缺什么给可复制的修复命令。环境没过就不要开始渲染。
 
-mock 结果仅用于结构演示，不能当成真实模型创意。本包提供简单图片视频渲染；版权审查、真实创意质量、平台验收与自动发布仍需另行完成。对外使用前检查事实、字幕时序与素材许可。
+## 输入约定
 
-## 上手示例与当前限制
+- 单商品：一个文件夹放图片（png/jpg/jpeg/webp/bmp，≥2 张且画面不同）+ `介绍.txt`；也可用 `--text` 指定文案文件。
+- 多商品：根目录下每个子文件夹各放 `介绍.txt` + ≥2 张图，一条命令批量出片。
+- 文案按 `。！？` 切句，每句 ≤160 字、单条视频 ≤30 句；每句自动分配 2 张图。
+- 字幕**整句同屏**显示：每行 ≤13 字、每屏最多 3 行，优先在逗号/句号后断行（不会把「不出门」拆成「不出 / 门」）；超过 39 字的长句才分成几屏依次显示。
+- **配图是按文件名顺序轮流分配，不是按内容语义匹配**。要精确对图，用 `--dry-plan` 看计划再改。
 
-先读 [README.md](README.md) 的快速开始、输入输出和未完成项；可运行例子在 examples/，本次修订见 CHANGELOG.md。不要把合成演示或离线检查当成真实平台验证。
+## 配音与联网（必须按此口径向用户说明）
 
-## 扩展能力
+| 模式 | 命令 | 文本去向 | 费用 |
+| --- | --- | --- | --- |
+| 离线（默认） | `--voice offline` | 不出本机，Windows SAPI 本地合成 | 免费 |
+| 在线 | `--voice online --allow-online-voice` | 发往微软 Edge 在线语音服务 `speech.platform.bing.com` 做 TTS；只发文字，不发图片；免账号免密钥 | 免费，但文本离开本机 |
 
-新增图片序列转竖屏 MP4，可接入本人提供的录音和 SRT 字幕；限定本地文件，新输出不覆盖旧文件。 使用前阅读 [README.md](README.md) 的“第二轮”命令和当前限制。不要把本地检查、人工声明或模拟响应解释为实时平台验证。
+- `--voice auto` 只会选离线；**环境不满足时不会偷偷改用在线配音**，会直接停下让你补依赖。
+- 用户没明确同意时，`--voice online` 会被拒绝（退出码 3），并打印「发什么、发到哪、是否收费」。
+- 本入口**不调用任何收费接口**，也不调用云端大模型；文案由用户提供，工具不做二次创作。
+- 不要声称已验证在线配音：本机缺 `websocket-client`，且未获用户同意，所以在线路线**未验证**。
 
-## 第三轮可执行能力
+## 会产出什么
 
-新增 Windows SAPI 中文/英文离线配音，以及文本→配音→图片视频的一键流程；画面时长自动延长以完整容纳语音，失败保留阶段状态。已实际生成中文配音并合成视频。
+`<输出>/` 下：`START_HERE.html`（带播放器的结果页）、`batch-report.json` / `batch-report.csv`（逐任务状态、每句起止时间、`decode_passed`、`human_reviewed=false`）、`products/job_<id>/<指纹>/video.mp4`（720×1280、H.264、AAC、烧录字幕）。
 
-执行命令和当前限制见 [README.md](README.md) 的第三轮章节。
+成片默认 720×1280、25fps、字幕白色 44px 带黑描边、顶部标题。**已解码 ≠ 已人工试听**，交付时要说明这一点。
 
-## 面向使用者的说明
+`batch-report.json` 的 `stats` 分两层：`speech_requests` / `clips_rendered` 是**本次进程新做的量**，`speech_calls` / `clips_resolved` 是**总调用量**（新做 + 复用缓存），`sentences_expected` 是应做的句数。若 `stats_consistent=false`，说明有句子复用了上一轮中断留下的缓存、或有任务未完成，此时看 `stats_note` 与 `jobs` 逐条核对，不要只引用 `stats`。（0.2.2 之前的版本在句数 ≥4 时只报新做量、容易被误读成漏做，现已修正。）
 
-解释用途、适用人群、下载和第一次运行时，读 [USER_GUIDE.md](USER_GUIDE.md)；需要中文对外介绍时参考 [INTRODUCTION.md](INTRODUCTION.md)，不要把介绍稿等同于已发布。
+## 缓存与改稿
 
-## 新版本地配音与代安装
+- 语音缓存 `speech-cache/`、片段缓存 `clip-cache/` 都是按内容指纹命名：同一句再次运行直接命中，不再请求配音。
+- 整条任务没变 → `SKIPPED_UNCHANGED`；改一句 → 只重做那一个片段（`clips_rendered=1`），旧成片保留，新成片进新指纹目录。
+- 缓存被写坏（上次崩溃留下半截文件）时，会把它改名成 `*.stale-<时间戳>` 留现场并自动重做一次，不会永久卡死；`stats.cache_repaired` 会记录次数。
 
-用户要做“照片+介绍→有配音视频”时，优先读USER_GUIDE.md并走MeloTTS路线，不默认选旧Windows系统声音。安装/失败时读安装与排错.md；用户希望WorkBuddy协助时提供WORKBUDDY.md的任务，不声称已在该客户端跑通。
+## 环境依赖
 
-入口：`python scripts/start_here.py --install --demo`。它在项目.venv安装依赖并下载固定校验值的官方模型，生成不覆盖已有目录的示例。已安装时用.venv里的Python执行`--doctor`检查；READY只表示环境通过。
+Python 3.10+、Pillow、FFmpeg（PATH 里有，或装 `imageio-ffmpeg` 自带二进制）、Windows 字体 `C:/Windows/Fonts/msyhbd.ttc`、中文 SAPI 语音包（离线配音用）。
+在线配音另需 `edge-tts` + `websocket-client`。
 
-换成用户素材时使用scripts/make_melo_video.py；保留清单相对路径限制和新输出目录要求。画面时长自动覆盖配音长度；逐句多图需要另做分镜，不把基础轮播当作自动语义配图。完成后返回真实MP4路径、检查音轨与解码，再请用户试听。
+退出码：`0` 全部成功；`1` 有任务失败；`2` 输入错误（路径不存在、图片不足 2 张、两张图完全相同等）；`3` 需同意或补依赖。
 
-## 用户已选晓晓女声
+## 其他路线（保留，按需选用）
 
-用户要视频同款或明确选D/晓晓时，先读[晓晓使用指南.md](晓晓使用指南.md)，用scripts/start_xiaoxiao.py安装并运行，不走MeloTTS/Windows路线。此模式将文本发往在线语音服务，需联网；遇到拒绝或验证停止处理，不绕过。脚本生成成功后返回MP4实际路径，并请用户试听。
+- **MeloTTS 本地大模型配音**：`scripts/start_here.py --install --demo`，需下载约 167MB 模型。本机未安装该模型，**未验证**。
+- **在线晓晓旧脚本**：`scripts/start_xiaoxiao.py` / `make_xiaoxiao_video.py`，等价于 `--voice online`，同样受同意约束。
+- **纯文字生产（口播稿/分镜/字幕）**：`python -m shortvideo_pipeline.cli single --brief examples/brief.json --dry-run --out output`，mock provider 只演示结构。
 
-## 多商品与反复改稿
+细节见 [README.md](README.md)、[批量商品视频.md](批量商品视频.md)、[晓晓使用指南.md](晓晓使用指南.md)、[安装与排错.md](安装与排错.md)；用户视角的教程在 [USER_GUIDE.md](USER_GUIDE.md)。
 
-用户有多个商品或反复改稿时，读[批量商品视频.md](批量商品视频.md)。先用plan_product_batch.py从授权商品文件夹生成清单并检查，再用batch_product_videos.py制作。每句要求至少两张内容不同的图片；按商品范围顺序分配，不声称自动识图选片。输出统一晓晓声音、标题和烧录字幕。
+## 不要做的事
 
-默认复用已验证的配音和片段缓存，未改任务跳过；修改内容形成新版本，保留旧成片。逐任务报告错误，语音服务失败后不对每个任务重复请求。查看批次HTML/CSV/JSON，返回真实MP4位置；已解码不等于已人工试听。
+不自动发布到任何平台；不替用户判断素材版权；不保证读音、断句和字幕时序正确；不把 mock 产物或合成示例当成真实业务效果；示例里的商品图和「视频」都是程序生成的合成素材。

@@ -1,2 +1,16 @@
-# 文本生产模式仅使用 Python 标准库（>=3.10）。可选本地视频渲染需要 Pillow 和 FFmpeg。
+# 文本生产模式仅使用 Python 标准库（>=3.10）。
+# 本节以下为「本地出片」路径的必需依赖；只做文本生产可不安装。
+#
+# 图片合成（scripts/make_video.py、tests/test_batch_videos.py 必需）
+Pillow>=10.0
+#
+# 自带 ffmpeg 二进制（免系统安装 / 免 PATH 配置）
+# scripts/make_video.py 会先调用 imageio_ffmpeg.get_ffmpeg_exe()，取不到再回退到系统 ffmpeg。
+# 若不装本包，必须自行保证 ffmpeg 在 PATH 中，否则 GATE 会报「FFmpeg 不可用」。
+imageio-ffmpeg>=0.5
+#
+# 可选：本地中文语音（离线配音）。不装则只能用 Windows SAPI 或在线 edge-tts。
+# sherpa-onnx>=1.10
+# soundfile>=0.12
+#
 # 若需本地大模型，请自行安装并运行 Ollama；云端模型仅需网络与 API key。

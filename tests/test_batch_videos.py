@@ -54,4 +54,18 @@ class BatchBehavior(unittest.TestCase):
     def test_changed_existing_video_is_not_overwritten(self):
         self.write([self.job]);r=self.run_batch();p=self.output/r['jobs'][0]['video'];p.write_bytes(b'user changed this video');again=self.run_batch()
         self.assertEqual(again['jobs'][0]['status'],'FAILED');self.assertEqual(p.read_bytes(),b'user changed this video')
+    def test_warm_rerun_report_stays_consistent(self):
+        """整批重跑报告必须自洽：2 段都在就是 2 段，不能写成 0 段未完成。"""
+        self.write([self.job]);self.run_batch();again=self.run_batch();st=again['stats']
+        self.assertEqual(again['jobs'][0]['status'],'SKIPPED_UNCHANGED')
+        self.assertEqual(st['clips_resolved'],2);self.assertTrue(st['stats_consistent'])
+        self.assertEqual((st['jobs_skipped'],st['jobs_total']),(1,1))
+        self.assertEqual(st['clips_rendered_this_run'],0)
+        self.assertNotIn('stats_note',st)
+    def test_report_file_on_disk_matches_returned(self):
+        """返回值和落盘报告不能是两套数字。"""
+        self.write([self.job]);self.run_batch();again=self.run_batch()
+        disk=json.loads((self.output/'batch-report.json').read_text(encoding='utf-8'))
+        self.assertEqual(disk['stats']['clips_resolved'],again['stats']['clips_resolved'])
+        self.assertTrue(disk['complete'])
 if __name__=='__main__':unittest.main()

@@ -1,0 +1,48 @@
+{
+  "tool": "batch-product-videos",
+  "version": 3,
+  "jobs": [
+    {
+      "id": "product-221af22ac9d6",
+      "title": "演示商品",
+      "status": "GENERATED_REVIEW_REQUIRED",
+      "video": "products/job_product-221af22ac9d6/a82b709e2d8bf85f/video.mp4",
+      "video_sha256": "ad3e460faec46ea317c49b4ad56a85e7c05d920b1249b4281753c691e429558d",
+      "seconds": 8.48,
+      "sentence_timing": [
+        {
+          "sentence": 1,
+          "text": "这道演示只用了三张图和两句话。",
+          "start": 0,
+          "seconds": 3.56,
+          "pictures": 2,
+          "picture_seconds": 1.78
+        },
+        {
+          "sentence": 2,
+          "text": "换成你自己的图片和介绍，就能做出同样的视频。",
+          "start": 3.56,
+          "seconds": 4.92,
+          "pictures": 2,
+          "picture_seconds": 2.46
+        }
+      ],
+      "burned_subtitles": true,
+      "minimum_pictures_per_sentence": 2,
+      "voice": "Windows SAPI 本地语音（Microsoft Huihui Desktop - Chinese (Simplified)）",
+      "pace": 1.2,
+      "decode_passed": true,
+      "human_reviewed": false
+    }
+  ],
+  "stats": {
+    "speech_requests": 2,
+    "speech_cache_hits": 0,
+    "clips_rendered": 2,
+    "clip_cache_hits": 0
+  },
+  "elapsed_seconds": 12.73,
+  "complete": true,
+  "published": false,
+  "voice": "Windows SAPI 本地语音（Microsoft Huihui Desktop - Chinese (Simplified)）"
+}

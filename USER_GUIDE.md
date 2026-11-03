@@ -1,75 +1,118 @@
 # 照片变配音视频：从下载到打开成片
 
-**视频同款晓晓女声：先读[晓晓使用指南](晓晓使用指南.md)，下载解压后双击“开始晓晓配音.cmd”。** 下方MeloTTS是另一种离线配音方案。
+你给几张商品图和几句介绍，这个工具把介绍读出来、配上图片、烧上字幕，做成 720×1280 的竖屏 MP4。以 Windows 11 + Python 3.13 为本次验证环境。
 
-你给几张商品图和几句介绍，这个工具把介绍读出来，配上图片，做成MP4。新版使用MeloTTS中文模型，不用Windows系统音色。以Windows + Python 3.12为本次验证环境。
+## 不会安装？先用 WorkBuddy 协助
 
-## 不会安装？先用WorkBuddy协助
+把仓库地址交给 WorkBuddy，并粘贴 [WORKBUDDY.md](WORKBUDDY.md) 里的任务。让它先跑环境自检、装到你选定的目录，再用示例生成一条视频。WorkBuddy 客户端内的导入执行已在本机实测过（见 README 的“本次完善”），但其他客户端未实测。
 
-可以先把仓库地址交给WorkBuddy，并粘贴[WORKBUDDY.md](WORKBUDDY.md)里的任务。让它先检查环境、安装到你选定的目录，再用示例生成视频。当前没有完成WorkBuddy客户端导入及执行实测，不把“看见链接”当作安装成功。
-
-## 自己装：按这7步做
-
-### 1. 下载整个技能
-
-[点这里下载ZIP](https://github.com/miaorrr8888-cloud/shortvideo-pipeline/archive/refs/heads/main.zip)。也可以打开仓库，点绿色Code，再点Download ZIP。
-
-你应该得到 shortvideo-pipeline-main.zip。不要只保存网页或复制SKILL.md。
-
-### 2. 解压，再打开里面的文件夹
-
-右键压缩包 → 全部解压。进入能同时看见 SKILL.md、开始使用.cmd、scripts、examples 的那一层。
-建议放在自己有权限的目录，例如“文档/我的视频工具”。不要放在系统目录。
-
-### 3. 准备Python 3.12
-
-若电脑没有Python 3.12，从[Python官网](https://www.python.org/downloads/windows/)下载3.12系列Windows安装器，选择“仅为当前用户安装”，勾选安装器提供的Add python.exe to PATH。不要卸载其他项目已有的Python。
-
-不确定是否装好，可让WorkBuddy检查，或在终端输入 `py -3.12 --version`，应该看到 Python 3.12.x。没有py时，检查 `python --version`。本自动安装路线只验证了3.12。
-
-### 4. 双击“开始使用.cmd”
-
-它会在项目里创建 .venv，安装必要工具，再从GitHub下载约167MB的中文语音模型；模型解压后会占更多空间。首次需要联网，模型准备好后，配音在本机完成。脚本不需要管理员权限，不会自动发布。
-
-窗口依次显示“创建运行环境”“安装工具”“检查中文语音模型”“生成视频”。下载时间受网速影响；未显示完成前不要关窗口。断网后重新运行会续传模型，失败会留下检查结果。
-
-如果系统提示文件风险或组织限制，先核对来源或交给助手分析，不要强行绕过。
-
-### 5. 找到刚生成的视频
-
-窗口出现“已生成，请打开：……”才代表示例生成成功。打开其给出的 runs/demo-日期-时间/video.mp4。
-同一目录的 narration.wav 是配音。runs/setup-result.json 是检查记录。自己听一遍、看一遍，确认没有念错或放错图。
-
-### 6. 换成自己的图片和文字
-
-先复制 examples/slides 到 examples/my-slides。把自己的图片放进去，编辑里面的 manifest.json：每张图写相对文件名和seconds；图片要在该清单目录内。把介绍另存为 examples/my-narration.txt（UTF-8）。
-
-```json
-{"slides":[{"image":"商品正面.jpg","seconds":2},{"image":"桌面场景.jpg","seconds":2}]}
-```
-
-seconds表示相对展示时长；文案更长时，工具会自动延长总时长，不把声音截断。需要严格一句两图时，先分句并为每句安排两幅画面；基础清单不会自动理解每句话的内容或自动找图。视频V5的72幅画面由本次人工分镜制作。
-
-### 7. 再生成一次
-
-在技能文件夹地址栏输入 powershell 回车，在打开的窗口粘贴：
+## 第 1 步：准备 Python
 
 ```powershell
-$videoFfmpeg = & .\.venv\Scripts\python.exe -c "import imageio_ffmpeg; print(imageio_ffmpeg.get_ffmpeg_exe())"
-.\.venv\Scripts\python.exe scripts/make_melo_video.py examples/my-slides/manifest.json examples/my-narration.txt runs/my-video-01 --model-dir models/vits-melo-tts-zh_en --ffmpeg $videoFfmpeg
+python --version
 ```
 
-做完打开 runs/my-video-01/video.mp4。重做时改为my-video-02等新目录，不会覆盖原结果。不会改文件或命令，直接让WorkBuddy根据你的图片和介绍代做，并要求读回成片位置。
+需要 3.10 或更高。装完 Python 重开一次 PowerShell，否则命令可能找不到。
 
-## 发生问题，先看这里
+## 第 2 步：进到技能目录
 
-读[安装与排错.md](安装与排错.md)。不要反复重装全部环境。请把报错最后几行与 runs/setup-result.json 交给助手；不要只说“不能用”。
+解压后打开**包含 SKILL.md、README.md 的那一层**文件夹，在地址栏输入 `powershell` 回车，就在这个目录打开了终端。
 
-## 当前能做什么
+## 第 3 步：装依赖
 
-可以解决：图片和文字分别配音、合成步骤多；配音比画面长造成截断；第一次依赖缺失难定位；换图换稿后重复制作。
-当前主要是图片轮播加解说，不是动态拍摄、数字人口型或自动运营。读音、事实和素材许可需要人检查。WorkBuddy自身可能消耗账户额度；本工具配音不用云端收费接口。
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install Pillow imageio-ffmpeg
+```
 
-## 多个商品怎么一起做
+`Pillow` 用来排版画面，`imageio-ffmpeg` 自带 FFmpeg 二进制，不用另外装 FFmpeg、也不用改 PATH。
 
-请转到[批量商品视频.md](批量商品视频.md)，按商品文件夹整理资料；支持逐句两图、画面字幕、断点复用和失败清单。
+## 第 4 步：环境自检
+
+```powershell
+.\.venv\Scripts\python.exe scripts/make_video.py --check
+```
+
+会逐项告诉你 PASS / FAIL。常见的两个 FAIL：
+
+- **中文字体 msyhbd.ttc 缺失**：非 Windows 系统，本模板不支持（未验证）。
+- **离线中文语音缺失**：Windows 设置 → 时间和语言 → 语音 → 添加中文语音包。
+
+自检通过（`离线配音可用：是`）再往下做。
+
+## 第 5 步：先用自带示例跑通
+
+```powershell
+.\.venv\Scripts\python.exe scripts/make_video.py --images examples/演示商品 --out .\示例成片 --voice offline
+```
+
+约十几秒后出结果，打开 `示例成片\START_HERE.html` 就能播放。想直接看效果、不想跑代码：`examples\示例输出` 里已经放了这条示例的真实成片。
+
+## 第 6 步：换成自己的商品
+
+在素材目录里建一个文件夹，比如 `D:\素材\榨汁杯`，放进去：
+
+- 至少 2 张图（最好 4–6 张：主图、细节、场景）；
+- 一个 `介绍.txt`，一句话一行，每行不超过 160 字。
+
+然后：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/make_video.py --images "D:\素材\榨汁杯" --out "D:\成片\榨汁杯" --voice offline --title "便携榨汁杯 350ml"
+```
+
+**先看计划再渲染**（不确定配图对不对时）：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/make_video.py --images "D:\素材\榨汁杯" --out "D:\成片\榨汁杯" --dry-plan
+```
+
+## 第 7 步：多个商品一起做
+
+`D:\素材\全部商品\` 下每个子文件夹放 `介绍.txt` + ≥2 张图，然后：
+
+```powershell
+.\.venv\Scripts\python.exe scripts/make_video.py --products "D:\素材\全部商品" --out "D:\成片\批次001" --voice offline
+```
+
+改动后的重跑：整条没改会跳过，改一句只重做那一段，旧成片不会被覆盖。
+
+## 关于在线配音（晓晓）
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install edge-tts websocket-client
+.\.venv\Scripts\python.exe scripts/make_video.py --images "..." --out "..." --voice online --allow-online-voice
+```
+
+**你加这个参数，就意味着同意**：每句文案的文字会发往微软 Edge 在线语音服务 `speech.platform.bing.com`（TTS，免账号免密钥，只发文字不发图片）。它免费，但文本确实离开了你的电脑。不想外发就用 `--voice offline`。
+
+不加 `--allow-online-voice` 时，工具会直接停下并说明这些内容，不会偷偷联网。
+
+## 成片之后还要做什么
+
+1. **听一遍**：型号、数字、专有名词最容易读错，读错就改文案重跑。
+2. **看一遍**：字幕有没有错字、图片和这句话对不对得上。
+3. 本工具**不会**自动发布到任何平台，也不判断素材版权。
+
+## 常见问题
+
+**提示“每句至少需要 2 张不同画面”**
+只有 1 张图，或者几张图其实完全一样（只是文件名不同）。
+
+**提示“环境未就绪”**
+先跑 `--check`，按 FAIL 项修复。工具不会为了绕过缺依赖而自动改用联网配音。
+
+**改完文案重跑，成片没变**
+整条内容没变时是 `SKIPPED_UNCHANGED`，属正常。改了才出新版本，旧成片仍在。
+
+**上次运行中断，现在一直报缓存问题**
+本版会自动把坏缓存改名成 `*.stale-<时间戳>` 再重做一次，不会永久卡住；报告里 `stats.cache_repaired` 记录了几次。
+
+**想用 MeloTTS 本地大模型配音**
+需要额外下载约 167MB 模型，走 `scripts/start_here.py`。本机**未验证**这条路线。
+
+## 验证范围
+
+Windows 11 + Python 3.13 实跑：离线配音出片、重跑命中缓存、改一句只重做一段、坏缓存自愈、在线配音同意闸门、缺依赖/缺文件/单图等异常。macOS、Linux、MeloTTS 模型、在线晓晓实际合成均**未验证**。
+
+许可证与来源见 [LICENSE](LICENSE)、[PROVENANCE.md](PROVENANCE.md)。

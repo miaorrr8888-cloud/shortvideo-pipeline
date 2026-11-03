@@ -3,7 +3,6 @@ import argparse,json,wave
 from pathlib import Path
 
 def synthesize(text_file,output,model_dir,speed=.95):
-    import sherpa_onnx,soundfile as sf
     model=Path(model_dir).resolve();target=Path(output).resolve()
     text=Path(text_file).read_text(encoding='utf-8-sig').strip()
     if not text or len(text)>10000:raise ValueError('Use 1..10000 characters')
@@ -11,6 +10,11 @@ def synthesize(text_file,output,model_dir,speed=.95):
     if target.exists():raise ValueError('Choose a new WAV filename')
     for name in ['model.onnx','tokens.txt','lexicon.txt']:
         if not (model/name).is_file():raise ValueError('Missing model file: '+name)
+    # 依赖放到输入校验之后导入：缺依赖时报错只说缺依赖，不会把“参数不对”误报成“依赖缺失”。
+    try:
+        import sherpa_onnx,soundfile as sf
+    except ImportError as e:
+        raise ValueError('MeloTTS dependencies missing (sherpa-onnx / soundfile); run: python -m pip install sherpa-onnx soundfile') from e
     cfg=sherpa_onnx.OfflineTtsConfig(model=sherpa_onnx.OfflineTtsModelConfig(vits=sherpa_onnx.OfflineTtsVitsModelConfig(model=str(model/'model.onnx'),tokens=str(model/'tokens.txt'),lexicon=str(model/'lexicon.txt'),dict_dir=str(model/'dict')),num_threads=4,provider='cpu'),max_num_sentences=1)
     if not cfg.validate():raise ValueError('Invalid model bundle')
     tts=sherpa_onnx.OfflineTts(cfg);gen=sherpa_onnx.GenerationConfig();gen.sid=0;gen.speed=speed;gen.silence_scale=.4

@@ -7,15 +7,15 @@
         {
           "text": "这只杯子，杯身是蓝绿色。",
           "images": [
-            "images/cup-1.png",
-            "images/cup-2.png"
+            "images/cup-1.jpg",
+            "images/cup-2.jpg"
           ]
         },
         {
           "text": "杯把是橙色，正面有一个白色三角形。",
           "images": [
-            "images/cup-2.png",
-            "images/cup-1.png"
+            "images/cup-2.jpg",
+            "images/cup-1.jpg"
           ]
         }
       ]
@@ -27,15 +27,15 @@
         {
           "text": "第二张图，是杯子放在桌上的样子。",
           "images": [
-            "images/cup-1.png",
-            "images/cup-2.png"
+            "images/cup-1.jpg",
+            "images/cup-2.jpg"
           ]
         },
         {
           "text": "两张图片，配上你写的介绍，就能做成小视频。",
           "images": [
-            "images/cup-2.png",
-            "images/cup-1.png"
+            "images/cup-2.jpg",
+            "images/cup-1.jpg"
           ]
         }
       ]
@@ -47,15 +47,15 @@
         {
           "text": "这只杯子，杯身是蓝绿色。",
           "images": [
-            "images/cup-2.png",
-            "images/cup-1.png"
+            "images/cup-2.jpg",
+            "images/cup-1.jpg"
           ]
         },
         {
           "text": "想换一句介绍，改完文字再做就可以。",
           "images": [
-            "images/cup-1.png",
-            "images/cup-2.png"
+            "images/cup-1.jpg",
+            "images/cup-2.jpg"
           ]
         }
       ]

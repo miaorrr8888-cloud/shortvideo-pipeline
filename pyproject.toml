@@ -4,11 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "shortvideo-pipeline"
-version = "0.1.0"
+version = "0.2.2"
 description = "短视频内容批量生成流水线：按 9 步框架产出短视频生产包（口播稿/分镜/字幕/封面/BGM/发布）"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []  # 零第三方依赖，仅标准库
+dependencies = []  # 核心（文本生产）零第三方依赖，仅标准库
+
+[project.optional-dependencies]
+# 本地出片路径必需：Pillow 合成画面 + imageio-ffmpeg 自带 ffmpeg 二进制
+render = ["Pillow>=10.0", "imageio-ffmpeg>=0.5"]
+# 离线中文语音（sherpa-onnx 跑 MeloTTS 官方 vits-melo-tts-zh_en）
+offline-tts = ["sherpa-onnx>=1.10", "soundfile>=0.12"]
 
 [project.scripts]
 shortvideo-pipeline = "shortvideo_pipeline.cli:main"

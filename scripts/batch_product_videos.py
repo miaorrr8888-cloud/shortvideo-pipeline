@@ -1,7 +1,7 @@
 """Batch product MP4s: two or more supplied images per sentence, burned captions, resumable caches."""
 from pathlib import Path
 import argparse,csv,hashlib,html,json,math,re,shutil,subprocess,tempfile,time,wave
-VERSION=1
+VERSION=5  # 渲染行为改动必须升这个号，否则旧片段缓存会被命中、看不到修复效果
 class SpeechUnavailable(RuntimeError):pass
 def digest(p):
     h=hashlib.sha256()
@@ -59,49 +59,199 @@ def read_jobs(manifest):
 def wrap(text,width=16):
     text=str(text).replace('\r',' ').replace('\n',' ')
     return [text[i:i+width] for i in range(0,len(text),width)]
+def wrap_px(draw,text,font,max_width):
+    """按真实像素宽度折行。固定字数折行会把「registry-video-20261018」切成
+    「registry-video-20261」+「018」，断在数字中间；按宽度算就不会。"""
+    text=str(text).replace('\r',' ').replace('\n',' ').strip()
+    if not text:return ['']
+    lines,cur=[],''
+    for ch in text:
+        if draw.textlength(cur+ch,font=font)<=max_width:
+            cur+=ch;continue
+        # 需要断行：当前行里有分隔符就尽量断在分隔符后，不切在单词或数字中间
+        cut=max((cur.rfind(s) for s in '-_/ ' if s in cur),default=-1)
+        if cut>0 and len(cur)-cut<=12:
+            lines.append(cur[:cut+1].rstrip());cur=cur[cut+1:]+ch
+        else:
+            lines.append(cur);cur=ch
+    if cur:lines.append(cur)
+    return lines
 def ass_time(t):
     c=round(t*100);return f'{c//360000}:{c//6000%60:02d}:{c//100%60:02d}.{c%100:02d}'
 def ass_escape(s):return s.replace('\\','＼').replace('{','｛').replace('}','｝')
+def caption_screens(text,per_line=13,max_lines=3):
+    """把一句文案折成若干「屏」，每屏内多行同屏显示，行间用 ASS 的 \\N 换行。
+
+    旧实现按 13 字硬切再逐块轮流显示，16 字的一句话会变成
+    「前 13 字显示 3 秒 + 剩 2 字闪 0.46 秒」；长句更会碎成十几个闪块，
+    观众读不完整句。现在短句一屏内折行同时显示，只有超过 max_lines 行的
+    超长句才分屏（每屏仍是完整可读的若干行）。
+    注意：先做 ass_escape 再插入 \\N，否则反斜杠会被转义成全角、换行失效。
+    """
+    text=ass_escape(str(text).replace('\r',' ').replace('\n',' ')).strip()
+    if not text:return ['']
+    parts=[s for s in re.split('(?<=[，。！？、；])',text) if s.strip()]
+    cap=per_line*max_lines;screens=[];cur=''
+    for part in parts:
+        while len(part)>cap:
+            if cur:screens.append(cur);cur=''
+            screens.append(part[:cap]);part=part[cap:]
+        if len(cur)+len(part)>cap:
+            screens.append(cur);cur=part
+        else:cur+=part
+    if cur:screens.append(cur)
+    return ['\\N'.join(_rows(s,per_line)) for s in screens]
+def _rows(s,per_line):
+    """行内折行：优先在标点后断，避免把「不出门」拆成「不出 / 门」。
+
+    中文没有空格，按字数硬切会稳定断在词中间；先按标点切成小段再贪心装行，
+    在不超过 per_line 的前提下尽量整段放进一行。
+    """
+    parts=[p for p in re.split('(?<=[，。！？、；：])',s) if p]
+    rows=[];cur=''
+    for p in parts:
+        while len(p)>per_line:
+            if cur:rows.append(cur);cur=''
+            rows.append(p[:per_line]);p=p[per_line:]
+        if len(cur)+len(p)<=per_line:cur+=p
+        else:
+            if cur:rows.append(cur)
+            cur=p
+    if cur:rows.append(cur)
+    # 末行只剩一两个字（常常只是一个句号）时，从上一行借最少的字
+    if len(rows)>1 and len(rows[-1])<4:
+        take=min(4-len(rows[-1]),len(rows[-2])-per_line//2)
+        if take>0:
+            rows[-1]=rows[-2][-take:]+rows[-1];rows[-2]=rows[-2][:-take]
+    return rows
 def captions(text,seconds,path):
-    chunks=[]
-    for part in re.split('(?<=[，。！？、；])',text):chunks.extend(wrap(part,16))
-    chunks=[s for s in chunks if s.strip()];total=sum(map(len,chunks));at=.04;events=[]
+    chunks=caption_screens(text);visible=lambda s:len(s.replace('\\N',''));total=sum(map(visible,chunks)) or 1;at=.04;events=[]
     for s in chunks:
-        end=min(seconds,at+(seconds-.04)*len(s)/total);events.append(f'Dialogue: 0,{ass_time(at)},{ass_time(end)},Default,,0,0,0,,{ass_escape(s)}');at=end
+        end=min(seconds,at+(seconds-.04)*visible(s)/total);events.append(f'Dialogue: 0,{ass_time(at)},{ass_time(end)},Default,,0,0,0,,{s}');at=end
     header='''[Script Info]
 ScriptType: v4.00+
 PlayResX: 720
 PlayResY: 1280
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Microsoft YaHei,36,&H00FFFFFF,&H000000FF,&H90000000,&H90000000,0,0,0,0,100,100,0,0,3,2,0,2,28,28,70,1
+Style: Default,Microsoft YaHei,44,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,3,1,2,28,28,70,1
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 '''
     path.write_text(header+'\n'.join(events),encoding='utf-8')
-def speech(text,root,state,speaker):
-    from synthesize_xiaoxiao import synthesize_text
-    provider=speaker or synthesize_text;source=Path(__file__).with_name('synthesize_xiaoxiao.py')
-    fingerprint=key({'text':text,'voice':'zh-CN-XiaoxiaoNeural','rate':'+12%','version':VERSION,'provider':digest(source),'test_provider':bool(speaker)})
-    folder=owned_dir(root,'speech-cache');mp3=folder/(fingerprint+'.mp3');meta=folder/(fingerprint+'.json')
+def stash_stale(path,state):
+    """缓存不完整时保留现场并让流程继续，而不是永久卡死。"""
+    stamp=time.strftime('%Y%m%d-%H%M%S')
+    target=path.with_name(path.name+'.stale-'+stamp)
+    path.replace(target)
+    state['cache_repaired']=state.get('cache_repaired',0)+1
+TEMP_DIR_PREFIXES=('clip-','speech-','concat-')
+def clean_orphan_temps(root):
+    """清掉上一次运行被中断时残留的临时目录，返回清理个数。
+
+    这些目录由 tempfile.TemporaryDirectory 创建，正常结束会自动删除；
+    只有进程被杀才会残留（表现为 clip-cache/clip-xxxxxx 之类）。
+    它们只是 ffmpeg 中间文件，删掉不影响任何可复用的缓存。
+    """
+    removed=0
+    for folder in ('clip-cache','speech-cache','products'):
+        base=Path(root)/folder
+        if not base.is_dir():continue
+        for p in base.rglob('*'):
+            if p.is_dir() and p.name.startswith(TEMP_DIR_PREFIXES):
+                shutil.rmtree(p,ignore_errors=True);removed+=1
+    return removed
+def resolved_sentences(rows):
+    """从每个任务的真实结果里数出已经落地的片段数（含上一轮跳过未改动的成片）。
+
+    为什么不能只数本进程的计数器：整批重跑时每个任务都走 SKIPPED_UNCHANGED，
+    既不配音也不渲染，计数器全是 0，但磁盘上 6 段成片都在。旧口径据此写出
+    「片段数 0 ≠ 句数 6」并暗示任务没做完——把一次正常的缓存复用报成了故障。
+
+    只数 sentence_timing：那是这个任务实际拼进成片的句子清单。
+    GENERATED_REVIEW_REQUIRED 和 SKIPPED_UNCHANGED 都带它；FAILED / BLOCKED 不带，
+    自然计 0，正好是"这段没落地"。
+    """
+    total=0
+    for row in rows or ():
+        if not isinstance(row,dict):continue
+        timing=row.get('sentence_timing')
+        if isinstance(timing,list):total+=len(timing)
+    return total
+def status_counts(rows):
+    """按状态分类计数。报告里要能一眼看出「没改动的」和「失败的」各几条。"""
+    counts={'jobs_total':0,'jobs_generated':0,'jobs_skipped':0,'jobs_failed':0}
+    for row in rows or ():
+        counts['jobs_total']+=1
+        status=row.get('status') if isinstance(row,dict) else None
+        if status=='SKIPPED_UNCHANGED':counts['jobs_skipped']+=1
+        elif status=='GENERATED_REVIEW_REQUIRED':counts['jobs_generated']+=1
+        else:counts['jobs_failed']+=1
+    return counts
+def stats_summary(state,expected_sentences,rows=None):
+    """把「本进程新做了什么」和「这份报告最终落地了多少段」分成两件事说清楚。
+
+    只报 speech_requests 会让人误以为 6 句只配了 1 次音：若上一轮运行被中断，
+    大部分片段已经是缓存命中，本进程确实只新做了几条。所以这里同时给出
+    本进程工作量（*_this_run）、整体落地数（clips_resolved）和一致性标记。
+
+    rows 给出时以「每个任务实际拼进去的句子数」为准（含缓存跳过的任务）；
+    老调用点不传 rows 时退回按本进程计数器求和，行为与旧版一致。
+    """
+    rendered=state.get('clips_rendered',0);cache_hits=state.get('clip_cache_hits',0)
+    requests=state.get('speech_requests',0);speech_hits=state.get('speech_cache_hits',0)
+    clips=resolved_sentences(rows) if rows is not None else rendered+cache_hits
+    out=dict(state)
+    out.update({'sentences_expected':expected_sentences,'clips_resolved':clips,
+                'speech_calls':requests+speech_hits,           # 兼容旧字段名：本进程总调用数
+                'speech_calls_this_run':requests,
+                'speech_from_cache_this_run':speech_hits,
+                'clips_rendered_this_run':rendered,
+                'clips_from_cache_this_run':cache_hits,
+                'stats_consistent':clips==expected_sentences})
+    if rows is not None:out.update(status_counts(rows))
+    if not out['stats_consistent']:
+        out['stats_note']=('已落地 %d 段 ≠ 应有 %d 段：逐条看 jobs 字段里的 status，'
+                           'FAILED/BLOCKED 的那几条就是缺口' % (clips,expected_sentences))
+    return out
+def speech(text,root,state,speaker,voice_label='zh-CN-XiaoxiaoNeural',audio_ext='.mp3'):
+    if speaker is None:
+        # 只有真的要调用在线语音时才导入 edge-tts，离线配音不依赖它。
+        from synthesize_xiaoxiao import synthesize_text as provider
+        provider_tag=digest(Path(__file__).with_name('synthesize_xiaoxiao.py'))
+    else:
+        provider=speaker;provider_tag='injected:'+str(voice_label)
+    fingerprint=key({'text':text,'voice':voice_label,'rate':'+12%','version':VERSION,'provider':provider_tag,'audio_ext':audio_ext})
+    folder=owned_dir(root,'speech-cache');mp3=folder/(fingerprint+audio_ext);meta=folder/(fingerprint+'.json')
     if mp3.exists():
-        if not meta.exists() or json.loads(meta.read_text(encoding='utf-8'))['sha256']!=digest(mp3):raise ValueError('Speech cache damaged; preserve it and inspect before retry')
-        state['speech_cache_hits']+=1;return mp3
+        intact=False
+        try:intact=meta.exists() and json.loads(meta.read_text(encoding='utf-8'))['sha256']==digest(mp3)
+        except (OSError,ValueError,KeyError):intact=False
+        if intact:
+            state['speech_cache_hits']+=1;return mp3
+        stash_stale(mp3,state)
+        if meta.exists():stash_stale(meta,state)
     if state.get('speech_blocked'):raise SpeechUnavailable('Speech service unavailable earlier in this run; no repeated request')
     try:
         with tempfile.TemporaryDirectory(prefix='speech-',dir=folder) as tmp:
-            tmp=Path(tmp);p=tmp/'voice.mp3';provider(text,p)
+            tmp=Path(tmp);p=tmp/('voice'+audio_ext);provider(text,p)
             if not p.is_file() or p.stat().st_size<128:raise RuntimeError('No usable voice file returned')
             with mp3.open('xb') as dest,p.open('rb') as src:shutil.copyfileobj(src,dest)
-        save(meta,{'sha256':digest(mp3),'voice':'zh-CN-XiaoxiaoNeural','rate':'+12%','text':text});state['speech_requests']+=1;return mp3
-    except Exception as e:state['speech_blocked']=True;raise SpeechUnavailable('Online voice failed: '+type(e).__name__) from e
-def sentence_clip(row,title,root,ff,pace,state,speaker):
-    style={'version':VERSION,'title':title,'text':row['text'],'images':row['image_hashes'],'pace':pace,'size':[720,1280],'captions':'burned','voice':'Xiaoxiao +12%','test_provider':bool(speaker)}
+        save(meta,{'sha256':digest(mp3),'voice':voice_label,'rate':'+12%','text':text});state['speech_requests']+=1;return mp3
+    except Exception as e:state['speech_blocked']=True;raise SpeechUnavailable('Voice generation failed: '+type(e).__name__) from e
+def sentence_clip(row,title,root,ff,pace,state,speaker,voice_label='zh-CN-XiaoxiaoNeural',audio_ext='.mp3'):
+    style={'version':VERSION,'title':title,'text':row['text'],'images':row['image_hashes'],'pace':pace,'size':[720,1280],'captions':'burned','voice':voice_label,'audio_ext':audio_ext}
     fingerprint=key(style);folder=owned_dir(root,'clip-cache');clip=folder/(fingerprint+'.mp4');meta=folder/(fingerprint+'.json')
     if clip.exists():
-        if not meta.exists() or json.loads(meta.read_text(encoding='utf-8'))['sha256']!=digest(clip):raise ValueError('Video cache damaged; inspect before retry')
-        info=json.loads(meta.read_text(encoding='utf-8'));state['clip_cache_hits']+=1;return clip,info['seconds']
-    voice=speech(row['text'],root,state,speaker)
+        intact=False;info=None
+        try:
+            info=json.loads(meta.read_text(encoding='utf-8'));intact=info['sha256']==digest(clip)
+        except (OSError,ValueError,KeyError):intact=False
+        if intact:
+            state['clip_cache_hits']+=1;return clip,info['seconds']
+        stash_stale(clip,state)
+        if meta.exists():stash_stale(meta,state)
+    voice=speech(row['text'],root,state,speaker,voice_label,audio_ext)
     from PIL import Image,ImageOps,ImageDraw,ImageFont
     with tempfile.TemporaryDirectory(prefix='clip-',dir=folder) as tmp:
         tmp=Path(tmp);wav=tmp/'voice.wav'
@@ -114,14 +264,14 @@ def sentence_clip(row,title,root,ff,pace,state,speaker):
         for n,p in enumerate(row['images']):
             frame=Image.new('RGB',(720,1280),'#fff8ee');im=ImageOps.contain(Image.open(p).convert('RGB'),(720,1030));frame.paste(im,((720-im.width)//2,115+(1030-im.height)//2))
             d=ImageDraw.Draw(frame)
-            for k,line in enumerate(wrap(title,20)):d.text((30,20+k*43),line,font=font,fill='#282622')
+            for k,line in enumerate(wrap_px(d,title,font,660)):d.text((30,20+k*43),line,font=font,fill='#282622')
             frame.save(tmp/f'{n:02d}.jpg',quality=94);lines.extend([f"file '{n:02d}.jpg'",f'duration {duration/len(row["images"])}'])
         lines.append(f"file '{len(row['images'])-1:02d}.jpg'");(tmp/'slides.txt').write_text('\n'.join(lines),encoding='utf-8');captions(row['text'],seconds,tmp/'captions.ass')
         command(ff,['-f','concat','-safe','1','-i','slides.txt','-i','voice.wav','-vf','fps=25,ass=captions.ass','-t',str(duration),'-c:v','libx264','-preset','fast','-crf','22','-threads','2','-pix_fmt','yuv420p','-c:a','aac','-ar','44100','-ac','2','-af','apad','clip.mp4'],tmp)
         with clip.open('xb') as dest,(tmp/'clip.mp4').open('rb') as src:shutil.copyfileobj(src,dest)
     save(meta,{'sha256':digest(clip),'seconds':duration,'style':style});state['clips_rendered']+=1;return clip,duration
-def render_job(job,root,ff,pace,state,speaker):
-    fingerprint=key({'job':{'id':job['id'],'title':job['title'],'sentences':[{'text':r['text'],'images':r['image_hashes']} for r in job['sentences']]},'pace':pace,'version':VERSION,'voice_impl':digest(Path(__file__).with_name('synthesize_xiaoxiao.py')),'test_provider':bool(speaker)})
+def render_job(job,root,ff,pace,state,speaker,voice_label='zh-CN-XiaoxiaoNeural',audio_ext='.mp3'):
+    fingerprint=key({'job':{'id':job['id'],'title':job['title'],'sentences':[{'text':r['text'],'images':r['image_hashes']} for r in job['sentences']]},'pace':pace,'version':VERSION,'voice_label':voice_label,'audio_ext':audio_ext,'provider':('injected' if speaker else digest(Path(__file__).with_name('synthesize_xiaoxiao.py')))})
     dest=root/'products'/('job_'+job['id'])/fingerprint[:16];result=dest/'result.json';video=dest/'video.mp4'
     if result.exists():
         report=json.loads(result.read_text(encoding='utf-8'))
@@ -129,34 +279,51 @@ def render_job(job,root,ff,pace,state,speaker):
         raise ValueError('Existing product result changed; preserve and inspect it')
     clips=[];timing=[];at=0
     for i,row in enumerate(job['sentences'],1):
-        p,seconds=sentence_clip(row,job['title'],root,ff,pace,state,speaker);clips.append(p);timing.append({'sentence':i,'text':row['text'],'start':round(at,3),'seconds':seconds,'pictures':len(row['images']),'picture_seconds':seconds/len(row['images'])});at+=seconds
+        p,seconds=sentence_clip(row,job['title'],root,ff,pace,state,speaker,voice_label,audio_ext);clips.append(p);timing.append({'sentence':i,'text':row['text'],'start':round(at,3),'seconds':seconds,'pictures':len(row['images']),'picture_seconds':seconds/len(row['images'])});at+=seconds
     dest=owned_dir(root,dest.relative_to(root))
     with tempfile.TemporaryDirectory(prefix='concat-',dir=dest) as tmp:
         tmp=Path(tmp);names=[]
         for i,p in enumerate(clips):shutil.copyfile(p,tmp/f'{i:02d}.mp4');names.append(f"file '{i:02d}.mp4'")
         (tmp/'clips.txt').write_text('\n'.join(names),encoding='utf-8');command(ff,['-f','concat','-safe','1','-i','clips.txt','-c','copy','-movflags','+faststart','assembled.mp4'],tmp)
         command(ff,['-i',str(tmp/'assembled.mp4'),'-f','null','-'])
+        if video.exists():
+            # result.json 丢了但成片还在（上次崩溃在写记录之前）：先留现场再重出，避免永久 FAILED。
+            stash_stale(video,state)
         with video.open('xb') as dst,(tmp/'assembled.mp4').open('rb') as src:shutil.copyfileobj(src,dst)
-    report={'id':job['id'],'title':job['title'],'status':'GENERATED_REVIEW_REQUIRED','video':video.relative_to(root).as_posix(),'video_sha256':digest(video),'seconds':round(at,3),'sentence_timing':timing,'burned_subtitles':True,'minimum_pictures_per_sentence':2,'voice':'Xiaoxiao +12%','pace':pace,'decode_passed':True,'human_reviewed':False}
+    report={'id':job['id'],'title':job['title'],'status':'GENERATED_REVIEW_REQUIRED','video':video.relative_to(root).as_posix(),'video_sha256':digest(video),'seconds':round(at,3),'sentence_timing':timing,'burned_subtitles':True,'minimum_pictures_per_sentence':2,'voice':voice_label,'pace':pace,'decode_passed':True,'human_reviewed':False}
     save(result,report);return report
-def batch(manifest,output,ffmpeg,pace=1.2,speaker=None):
+def batch(manifest,output,ffmpeg,pace=1.2,speaker=None,voice_label='zh-CN-XiaoxiaoNeural',audio_ext='.mp3'):
+    source,jobs=read_jobs(manifest)
+    return batch_from_jobs(jobs,source.parent,output,ffmpeg,pace,speaker,voice_label,audio_ext)
+
+
+def batch_from_jobs(jobs,base,output,ffmpeg,pace=1.2,speaker=None,voice_label='zh-CN-XiaoxiaoNeural',audio_ext='.mp3'):
+    """直接接收 jobs 列表（图片路径相对 base），供统一入口在内存里组织任务，不必先写 manifest。"""
     if type(pace) not in {int,float} or not math.isfinite(pace) or not 1<=pace<=1.5:raise ValueError('Pace must be 1.0..1.5')
     ff=shutil.which(ffmpeg)
     if not ff:raise ValueError('FFmpeg unavailable')
-    source,jobs=read_jobs(manifest)
+    base=Path(base).resolve()
+    if not isinstance(jobs,list) or not 1<=len(jobs)<=50:raise ValueError('Batch needs 1..50 jobs')
     if Path(output).is_symlink():raise ValueError('Output folder must not be a symbolic link')
     root=Path(output).resolve();marker=root/'batch-output.json'
     if root.exists():
         if root.is_symlink() or not marker.is_file() or json.loads(marker.read_text(encoding='utf-8')).get('tool')!='batch-product-videos':raise ValueError('Refusing to reuse a folder not created by this batch tool')
     else:root.mkdir(parents=True);save(marker,{'tool':'batch-product-videos','version':VERSION})
     state={'speech_requests':0,'speech_cache_hits':0,'clips_rendered':0,'clip_cache_hits':0};rows=[];started=time.monotonic()
+    state['temp_cleaned']=clean_orphan_temps(root)
     for i,item in enumerate(jobs,1):
         ident=item.get('id',f'row-{i}') if isinstance(item,dict) else f'row-{i}'
-        try:job=validate_job(item,source.parent);row=render_job(job,root,ff,pace,state,speaker)
+        try:job=validate_job(item,base);row=render_job(job,root,ff,pace,state,speaker,voice_label,audio_ext)
         except Exception as e:row={'id':ident,'status':'BLOCKED_SPEECH_SERVICE' if isinstance(e,SpeechUnavailable) else 'FAILED','error_type':type(e).__name__,'error':str(e)[:500]}
         rows.append(row);print(f'{i}/{len(jobs)} {ident}: {row["status"]}',flush=True)
-        save(root/'batch-report.json',{'jobs':rows,'stats':state,'complete':False})
-    report={'tool':'batch-product-videos','version':VERSION,'jobs':rows,'stats':state,'elapsed_seconds':round(time.monotonic()-started,2),'complete':True,'published':False};save(root/'batch-report.json',report)
+        # 中途落盘也要有可信统计：进程被杀时这份文件是唯一线索
+        save(root/'batch-report.json',{'tool':'batch-product-videos','version':VERSION,'jobs':rows,
+                                      'stats':stats_summary(state,sum(len(x.get('sentences') or []) for x in jobs if isinstance(x,dict)),rows),
+                                      'complete':False})
+    expected=sum(len(item.get('sentences') or []) for item in jobs if isinstance(item,dict))
+    stats=stats_summary(state,expected,rows)
+    report={'tool':'batch-product-videos','version':VERSION,'jobs':rows,'stats':stats,'elapsed_seconds':round(time.monotonic()-started,2),'complete':True,'published':False,'voice':voice_label};save(root/'batch-report.json',report)
+
     with (root/'batch-report.csv').open('w',encoding='utf-8-sig',newline='') as f:
         w=csv.DictWriter(f,fieldnames=['id','status','video','error']);w.writeheader()
         for row in rows:w.writerow({k:row.get(k,'') for k in w.fieldnames})

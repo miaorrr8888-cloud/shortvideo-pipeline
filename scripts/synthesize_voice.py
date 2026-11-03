@@ -1,6 +1,9 @@
 """Offline Windows SAPI narration; no account, uploads, network, or voice cloning."""
-import argparse,json,os,shutil,subprocess,tempfile,wave
+import argparse,json,os,shutil,subprocess,sys,tempfile,wave
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from win_env import resolve_powershell
 
 def synthesize(text_file,output,language='zh-CN',voice='',rate=0):
     text_file=Path(text_file).resolve();output=Path(output).resolve()
@@ -9,8 +12,8 @@ def synthesize(text_file,output,language='zh-CN',voice='',rate=0):
     if type(rate)!=int or not -10<=rate<=10:raise ValueError('rate must be -10..10')
     if output.exists() or output.suffix.lower()!='.wav':raise ValueError('output must be a new .wav file')
     if os.name!='nt':raise ValueError('Windows SAPI requires Windows; supply an external narration file on other systems')
-    executable=shutil.which('powershell.exe')
-    if not executable:raise ValueError('Windows PowerShell unavailable')
+    executable=resolve_powershell()
+    if not executable:raise ValueError('Windows PowerShell unavailable (not in PATH and not in System32)')
     output.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='narration-',dir=output.parent) as d:
         d=Path(d);source=d/'text.txt';source.write_text(text,encoding='utf-8');temp=d/'voice.wav'

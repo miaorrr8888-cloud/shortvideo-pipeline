@@ -1,51 +1,102 @@
 # 照片加文字，做成配音小视频
 
-**新版重点：[批量商品视频](批量商品视频.md)**——按商品文件夹整理图片和介绍，逐句两图与烧录字幕；未改任务跳过，改一句只重做相关片段，失败单独记录。已实测3个制作任务，不宣称替代所有视频工具。
+一个商品文件夹 + 一段介绍，一条命令出竖屏 MP4：带中文配音、烧录字幕、批量排队、改一句只重做那一段。
 
-**视频同款晓晓女声：先读[晓晓使用指南](晓晓使用指南.md)，下载解压后双击“开始晓晓配音.cmd”。** 下方MeloTTS是另一种离线配音方案。
-
-[从下载到打开成片：7步教程](USER_GUIDE.md) · [让WorkBuddy帮你安装](WORKBUDDY.md) · [安装与排错](安装与排错.md) · [用途与适用人群介绍](INTRODUCTION.md)
+[从下载到打开成片：7步教程](USER_GUIDE.md) · [安装与排错](安装与排错.md) · [批量与改稿细节](批量商品视频.md) · [晓晓在线女声](晓晓使用指南.md) · [用途与适用人群介绍](INTRODUCTION.md)
 
 `shortvideo-pipeline` · 独立技能仓库 · MIT
 
-适合：需要写口播稿、分镜和字幕的创作者、小商家
+适合：需要给商品图配口播视频的小商家、电商运营、内容创作者
 
-## 解决什么问题
-
-输入选题、观众与时长，得到可以继续拍摄、录音和剪辑的文本生产包。
-
-## 新版：不用Windows系统声音
-
-下载解压后，准备Python 3.12，双击“开始使用.cmd”。它在项目里安装依赖、下载MeloTTS模型，再生成示例视频。详见上方7步教程。模型首次下载约167MB；配音在本机完成。
-
-本地已验证新模型配音与图片合成；WorkBuddy客户端导入执行尚未实测。下方原文字生产流水线和旧SAPI说明保留作其他模式参考；要使用新版声音，请走USER_GUIDE.md的MeloTTS路线。
-
-## 文字材料模式快速开始
-
-Python 3.10+，离线 mock 只用标准库。真实模型另行配置；本次不测试或收费调用云端模型。
-
-在本仓库根目录运行：
+## 快速开始（三条命令）
 
 ```sh
-python -m shortvideo_pipeline.cli single --brief examples/brief.json --dry-run --out output
-python -m shortvideo_pipeline.cli self-test
+# 1. 先自检：缺什么会直接告诉你修什么
+python scripts/make_video.py --check
+
+# 2. 单商品：文件夹里放图片 + 介绍.txt
+python scripts/make_video.py --images "D:\素材\榨汁杯" --out "D:\成片\榨汁杯"
+
+# 3. 多商品：根目录下每个子文件夹各放 介绍.txt + ≥2 张图
+python scripts/make_video.py --products "D:\素材\全部商品" --out "D:\成片\批次001"
 ```
+
+跑完打开 `<输出>/START_HERE.html`，里面直接能播放每条成片。
+
+> 示例素材与示例成片都在 `examples/`：`examples/演示商品` 可直接跑，`examples/示例输出` 是它的真实运行结果。
 
 ## 输入与输出
 
-**输入**：examples/brief.json：title（非空字符串）、duration_target（正整数）、pain_points（字符串数组），其余字段见示例。
+**输入**：图片（png/jpg/jpeg/webp/bmp，每句至少 2 张且画面真的不同）+ 介绍文案（`介绍.txt` 或 `--text`）。文案按 `。！？` 切句，每句 ≤160 字、单条 ≤30 句。
 
-**输出**：output 下的新目录，含口播稿、Markdown 分镜、SRT 字幕、封面/BGM/发布建议及 JSON 元数据。mock 只演示结构。
+**输出**：
 
-## 本次完善
+| 文件 | 内容 |
+| --- | --- |
+| `products/job_<id>/<指纹>/video.mp4` | 720×1280、H.264 + AAC、烧录字幕的成片 |
+| `START_HERE.html` | 结果页，带播放器与下载链接 |
+| `batch-report.json` / `.csv` | 逐任务状态、每句起止时间、`decode_passed`、`human_reviewed=false` |
+| `speech-cache/` `clip-cache/` | 配音与片段缓存，按内容指纹命名 |
 
-原有缺口：只有工程和基础示例，重复导出可能覆盖文件，dry-run 还能被 provider 参数覆盖。
+## 配音：默认离线，联网要先问你
 
-已补：重复导出自动建立新目录；检查标题、时长和痛点字段；dry-run 始终走离线 mock；补正式简报示例。
+| 模式 | 命令 | 文字去向 | 费用 |
+| --- | --- | --- | --- |
+| 离线（默认） | `--voice offline` | 留在本机，Windows SAPI 合成 | 免费 |
+| 在线 | `--voice online --allow-online-voice` | 发往微软 Edge 在线语音服务 `speech.platform.bing.com`（只发文字，不发图片） | 免费，但文本离开本机 |
+
+- 不给 `--allow-online-voice` 就选在线，会被直接拒绝（退出码 3），并说明发什么、发到哪、是否收费。
+- `--voice auto` 只选离线；环境不满足时停下让你补依赖，**不会偷偷切成联网配音**。
+- 本工具不调用任何收费接口、不调用云端大模型；文案由你提供。
+
+## 批量、缓存与局部改稿
+
+- 同一句话再跑：命中语音缓存，不再请求合成。
+- 整条没改：`SKIPPED_UNCHANGED`，不会重做。
+- 只改一句：只重做那一个片段（`clips_rendered=1`），旧成片保留，新成片进新指纹目录。
+- 缓存被写坏（断电、上次崩溃留下半截文件）：自动改名成 `*.stale-<时间戳>` 留现场后重做一次，不会永久卡住。
+
+## 参数
+
+| 参数 | 说明 |
+| --- | --- |
+| `--images` / `--products` | 二选一：单个商品文件夹 / 商品根目录 |
+| `--out` | 输出目录（新建，或本工具创建过的目录） |
+| `--text` | 文案文件；不给则读文件夹里的 `介绍.txt` |
+| `--title` | 视频顶部标题，默认取文件夹名 |
+| `--voice` | `auto` / `offline` / `online` |
+| `--allow-online-voice` | 同意把文案文字发往微软在线语音 |
+| `--offline-voice` | 指定本机 SAPI 音色全名 |
+| `--pace` | 语速倍率 1.0–1.5，默认 1.2 |
+| `--dry-plan` | 只打印分句与配图计划，不渲染 |
+
+退出码：`0` 全成功；`1` 有任务失败；`2` 输入错误；`3` 需同意或补依赖。
+
+## 本次完善（1.0.0）
+
+原有缺口：入口分散（批量脚本要手写 manifest、还要自己传 `--ffmpeg`），没有环境自检，联网配音没有知情同意闸门，音色被硬编码成晓晓（离线配音也写成晓晓，报告会误导），缓存半截文件会让输出目录永久失败。
+
+已补：
+
+1. **统一入口** `scripts/make_video.py`：`--check` 自检 + 单商品 + 多商品批量，自动定位 FFmpeg（PATH 找不到时用 `imageio-ffmpeg` 自带二进制）。
+2. **配音知情同意**：在线配音必须显式 `--allow-online-voice`，否则拒绝并说明数据去向；`auto` 不会偷偷联网。
+3. **音色如实标注**：报告、缓存指纹、结果页记录真实音色（离线 = Windows SAPI + 具体音色名），不再一律写晓晓。
+4. **缓存自愈**：语音/片段/成片任一环节残留半截文件，改名 `*.stale-*` 留现场后重做，不再永久 FAILED。
+5. **字幕可读性**：字号 36→44、每行 16→13 字、改为白字黑描边（原来是半透明灰底），浅色背景上也能看清。
+6. **离线配音不再依赖 edge-tts**：只在真要走在线时才导入，缺依赖不影响离线出片。
+7. **MeloTTS 报错归因修正**：先校验输入再导入依赖，缺依赖时报「缺依赖」而不是把参数错误误报成别的问题。
+8. **示例瘦身**：示例图 1254px PNG（3.8MB）→ 720px JPEG，安装包能压进 3MB 以内。
 
 ## 当前限制
 
-配音依赖 Windows 已安装的声音；Linux/macOS 仍需提供外部录音。受限运行环境可能无法初始化系统声音，不应修改安全策略来绕过。生成声音需要试听；静态图片视频不等于复杂动态剪辑或平台验收。
+- 模板固定 720×1280、25fps，字体硬依赖 Windows `msyhbd.ttc`；换尺寸/字体属于改造，未提供开关。
+- 配图按文件名顺序轮流分配，**不是按画面内容语义匹配**；要精确对图用 `--dry-plan` 核对。
+- 不给视频封面帧单独导出，标题只显示在画面顶部。
+- 读音与断句由语音引擎决定，专有名词、型号、数字容易读错，必须人工试听。
+- 在线配音（含晓晓）**未验证**：本机缺 `websocket-client`，且未取得用户同意，没有发起过联网请求。
+- MeloTTS 路线**未验证**：模型未下载（约 167MB），本机未安装。
+- macOS / Linux 未验证：离线配音依赖 Windows SAPI，模板依赖 Windows 字体。
+- `python -m shortvideo_pipeline.cli` 的纯文字生产（口播稿/分镜/字幕）仍是 mock provider，只演示结构，不是真实模型创意。
 
 ## 验证与使用注意
 
@@ -53,43 +104,39 @@ python -m shortvideo_pipeline.cli self-test
 python -m unittest discover -s tests -v
 ```
 
-测试覆盖被断言的离线行为，不等于真实平台、生产模型或业务效果验证。
+56 项测试，其中新增 16 项覆盖：环境自检结构、分句与配图分配、在线配音同意闸门、`auto` 不偷偷联网、缺文件夹/缺 `--out`/单图/两种模式同用、`--dry-plan` 不产出、真实离线出片 + 重跑命中缓存 + 改一句只重做一段、坏缓存自愈。
 
-示例数据和图片均为合成演示，不是真实客户、交易、销量或模型成绩。不要提交真实凭据和私有输入。
+测试只覆盖可断言的离线行为，不等于平台验收或业务效果；`examples/示例输出` 是真实运行产物（合成素材）。
 
 ## 来源与工作记录
 
-由 miaorrr8888-cloud 在 AI 辅助下积累和维护，来源与边界见 [PROVENANCE.md](PROVENANCE.md)，许可见 [LICENSE](LICENSE)。
+由 miaorrr8888-cloud 在 AI 辅助下积累和维护，来源与边界见 [PROVENANCE.md](PROVENANCE.md)，许可见 [LICENSE](LICENSE)。本版在其公开版本基础上扩展了统一入口与配音同意机制，署名与许可证保留不变。
 
 [全部独立技能与阶段性工作记录](https://github.com/miaorrr8888-cloud/agent-skills-worklog)
 
-## 第二轮：本地视频渲染
-
-新增图片序列转竖屏 MP4，可接入本人提供的录音和 SRT 字幕；限定本地文件，新输出不覆盖旧文件。
-
-在仓库根目录运行：
+## 其他路线（保留）
 
 ```sh
-python -m pip install Pillow
+# 文字生产（口播稿/分镜/字幕，mock）
+python -m shortvideo_pipeline.cli single --brief examples/brief.json --dry-run --out output
+
+# 图片序列 → MP4（可接自己的录音和 SRT）
 python scripts/render_slideshow.py examples/slides/manifest.json demo.mp4 --subtitles examples/slides/captions.srt
-# 接入自己的录音：追加 --audio narration.wav
-# FFmpeg 未加入 PATH 时：追加 --ffmpeg /path/to/ffmpeg
+
+# 旧批量入口（手写 jobs.json）
+python scripts/batch_product_videos.py examples/batch-products/jobs.json out-batch --ffmpeg <ffmpeg路径>
+
+# MeloTTS 本地大模型配音（需下载约 167MB 模型，本机未验证）
+python scripts/start_here.py --install --demo
 ```
 
-新增工具的输入字段见脚本参数与 examples/。快照示例采用固定日期，过期后正常返回 HOLD；需要检查新采集的页面时填写真实带时区的采集时间，不要改日期伪装新证据。
+[FFmpeg 官方文档](https://ffmpeg.org/ffmpeg.html)。渲染只以本地素材为输入，不下载素材、不发布。
 
-## 接入依据
+## 运行环境
 
-[FFmpeg 官方文档](https://ffmpeg.org/ffmpeg.html)。渲染以本地提供的音视频素材为输入，没有下载素材或发布操作。
+| 项 | 状态 |
+|---|---|
+| Windows 11 + Python 3.12 / 3.13 | ✅ 实测通过 |
+| Linux / macOS | ⚠️ **未实测**。代码用 `pathlib`，无硬编码分隔符，理论上可跑，但测试只在 Windows 跑过，不声称支持 |
 
-## 第三轮：本地配音与一键成片
-
-新增 Windows SAPI 中文/英文离线配音，以及文本→配音→图片视频的一键流程；画面时长自动延长以完整容纳语音，失败保留阶段状态。已实际生成中文配音并合成视频。
-
-```sh
-python -m pip install Pillow
-python scripts/synthesize_voice.py examples/narration.txt narration.wav --language zh-CN
-python scripts/make_narrated_video.py examples/slides/manifest.json examples/narration.txt narrated-output
-# FFmpeg 未在 PATH：追加 --ffmpeg /path/to/ffmpeg
-# 接入自己的字幕：追加 --subtitles captions.srt
-```
+诚实标注：没实跑过的平台，不要在对外文案里写「已支持」。
