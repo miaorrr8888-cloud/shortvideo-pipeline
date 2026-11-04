@@ -1,5 +1,8 @@
 ---
 name: shortvideo-pipeline
+slug: zhengrong-shortvideo-pipeline
+displayName: "批量商品配音视频"
+summary: "给商品图片和一段介绍，一条命令出带中文配音与烧录字幕的 1080x1920 竖屏视频；支持批量、缓存复用与局部改稿，配音默认本机离线。"
 description: 给商品图片和一段介绍，一条命令做出带中文配音、烧录字幕的竖屏视频；支持批量、缓存复用和局部改稿，配音默认本机离线，联网配音必须先经用户同意。
 license: MIT
 version: 0.2.3
