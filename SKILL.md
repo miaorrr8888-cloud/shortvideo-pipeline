@@ -2,7 +2,7 @@
 name: shortvideo-pipeline
 description: 给商品图片和一段介绍，一条命令做出带中文配音、烧录字幕的竖屏视频；支持批量、缓存复用和局部改稿，配音默认本机离线，联网配音必须先经用户同意。
 license: MIT
-version: "0.2.2"
+version: 0.2.3
 display_name: "批量商品配音视频"
 agent_created: true
 

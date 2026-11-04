@@ -1,5 +1,28 @@
 # 更新记录
 
+## 2026-11-03 · v0.2.3
+
+### 修复
+
+- **`batch-report.json` 统计错误（实跑复现后修）**：整批重跑时每个任务都走 `SKIPPED_UNCHANGED`，
+  计数器全为 0，报告却写 `clips_resolved: 0` + `stats_consistent: false`，并提示「可能有任务未完成」——
+  把一次正常的缓存复用报成了故障。
+  改为按每个任务实际拼进成片的句数统计（`resolved_sentences`），并区分
+  `clips_rendered_this_run` / `clips_from_cache_this_run` / `clips_resolved`。
+- 新增任务状态计数：`jobs_total` / `jobs_generated` / `jobs_skipped` / `jobs_failed`。
+- 中途落盘的那份 `batch-report.json` 现在也带完整统计，进程被杀时不会再留下一份没数的报告。
+- 删掉 `stats_summary` 末尾一行永远执行不到的 `return target` 死代码。
+- CLI 汇总行改为「成片共 N 段（本次新渲染 A，本次命中缓存 B）」，
+  并显式说明「其中 K 个商品与上次完全一致，整条成片直接复用」。
+
+### 实测（本机 Windows 11 + Python 3.13 + 微软 Huihui 离线语音）
+
+- 单商品 3 句：11.32 秒成片，720×1280 H.264 + AAC，`volumedetect` 均值 -21.8 dB（有人声，非静音）；
+  抽帧确认中文字幕已烧录、未被裁切。
+- 缓存：同参数第二次运行 → `SKIPPED_UNCHANGED`，报告自洽。
+- 批处理：2 商品 4 句 → 两条成片；改其中 1 句 → 只重渲 1 段、命中缓存 1 段、另一商品整条复用。
+- 测试：83 项通过（新增 6 项针对统计口径与落盘一致性）。
+
 ## 2026-11-03 · v0.2.2 修掉报告统计误读（原「已知未修」问题的真正根因）
 
 ### 根因：不是漏计数，是报告只描述了「最后一个进程」
